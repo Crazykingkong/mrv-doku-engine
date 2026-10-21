@@ -1,1 +1,344 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forensische Dokumentations-Engine (MRV § 63)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-slate-100">MRV Doku-Engine <span class="text-xs px-2 py-0.5 rounded bg-emerald-900 text-emerald-300 font-normal">v2.0 KIS-Optimiert</span></h1>
+                <p class="text-xs text-slate-400">Forensische Arbeitstherapie – Maßregelvollzug § 63 StGB</p>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span class="text-xs text-slate-400 font-medium">Modus:</span>
+                <button id="modeToggle" onclick="toggleReportMode()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm">
+                    Modus: 14-Tage-Kurzbericht (KIS)
+                </button>
+            </div>
+        </div>
+    </header>
+<main class="max-w-7xl mx-auto flex-1 w-full p-4 grid grid-cols-1 lg:grid-cols-12 gap-6 my-4">
+        <!-- Linke Spalte: Bedienung & Auswahl -->
+        <div class="lg:col-span-7 space-y-6">
+            <!-- Stammdaten -->
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-4 shadow-lg">
+                <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-3">1. Stammdaten & Zeitraum</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Name des Patienten</label>
+                        <input type="text" id="patientName" placeholder="z. B. Herr M." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Berichtszeitraum / Intervall</label>
+                        <input type="text" id="reportPeriod" placeholder="z. B. 01.10.2026 – 14.10.2026" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+            </div>
 
+            <!-- MELBA Module Container -->
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-4 shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">2. MELBA-Leistungsprofil & Verhaltensbeurteilung</h2>
+                    <span class="text-xs text-indigo-400 bg-indigo-950/60 px-2.5 py-1 rounded-full border border-indigo-800/50">9 Kriterien aktiv</span>
+                </div>
+                <div id="melbaContainer" class="space-y-4">
+                    <!-- Wird dynamisch über JS gerendert oder direkt strukturiert -->
+                </div>
+            </div>
+        </div>
+        <!-- Rechte Spalte: Live-Vorschau & Text-Generierung -->
+        <div class="lg:col-span-5">
+            <div class="sticky top-24 bg-slate-800/80 border border-slate-700/60 rounded-xl p-4 shadow-lg flex flex-col h-[calc(100vh-7.5rem)]">
+                <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-700/60">
+                    <div>
+                        <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">3. Berichtsvorschau</h2>
+                        <span id="wordCountBadge" class="text-xs text-slate-400">0 Wörter | 0 Zeichen</span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="copyReport()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-1.5 rounded-lg font-medium transition flex items-center space-x-1 shadow-sm">
+                            <span>Kopieren</span>
+                        </button>
+                        <button onclick="resetAll()" class="bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 text-xs px-3 py-1.5 rounded-lg font-medium transition">
+                            Zurücksetzen
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Textarea für den finalen Bericht (direkt bearbeitbar) -->
+                <div class="flex-1 flex flex-col mb-3">
+                    <textarea id="reportOutput" class="w-full flex-1 bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-200 leading-relaxed focus:outline-none focus:border-indigo-500 resize-none custom-scrollbar" placeholder="Der generierte Bericht erscheint hier automatisch nach Auswahl der Parameter..."></textarea>
+                </div>
+
+                <!-- Schnell-Hinweis für den Therapeuten -->
+                <div class="bg-slate-900/60 border border-slate-700/40 rounded-lg p-3 text-xs text-slate-400">
+                    <span class="font-semibold text-slate-300">Hinweis:</span> Im KIS-Modus werden die 9 Merkmale intelligent zu 3–4 kompakten Sätzen verschmolzen. Manuelle Korrekturen sind direkt im Textfeld möglich.
+                </div>
+            </div>
+        </div>
+    </main>
+    <script>
+        // Definition der 9 MELBA-Kriterien mit forensisch optimierten Stufen (1-5)
+        const melbaCriteria = [
+            {
+                id: 'konz',
+                name: '1. Konzentration & Ausdauer',
+                desc: 'Aufmerksamkeitsspanne und Durchhaltevermögen bei arbeitsbezogenen Aufgaben.',
+                levels: {
+                    1: 'zeigte eine grundlegend stabile Konzentration mit moderatem Bedarf an strukturellen Unterbrechungen',
+                    2: 'bewältigte Arbeitsabläufe bei wechselnder Ausdauer mit erkennbaren Phasen konzentrierter Mitarbeit',
+                    3: 'hielt die Aufmerksamkeit über längere Phasen aufrecht und zeigte eine verlässliche Ausdauer',
+                    4: 'bearbeitete auch komplexe Aufgaben mit konstanter Konzentration und hoher Durchhaltekraft',
+                    5: 'zeigte ein durchgehend hohes und stabiles Konzentrationsniveau ohne nennenswerte Leistungsschwankungen'
+                }
+            },
+            {
+                id: 'anw',
+                name: '2. Arbeitsweise & Durchführung',
+                desc: 'Zielgerichtete Umsetzung von Arbeitsschritten und Handhabung von Werkzeugen.',
+                levels: {
+                    1: 'setzte einfache Arbeitsschritte nach Anleitung und unter regelmäßiger Begleitung um',
+                    2: 'führte Arbeitsaufträge bei bekannter Struktur selbstständig und mit überschaubarer Fehlerquote aus',
+                    3: 'arbeitete zielgerichtet, handhabte Werkzeuge sicher und setzte Vorgaben zuverlässig um',
+                    4: 'erledigte anspruchsvolle Aufgaben eigenständig, präzise und mit guter handwerklicher Qualität',
+                    5: 'zeigte eine durchgehend exakte, saubere und vollständig eigenverantwortliche Arbeitsweise'
+                }
+            },
+            {
+                id: 'qual',
+                name: '3. Arbeitsgüte & Ergebnis',
+                desc: 'Präzision, Sorgfalt und Qualität des gefertigten Produkts oder der erbrachten Leistung.',
+                levels: {
+                    1: 'erzielte unter Berücksichtigung der Einschränkungen eine akzeptable, funktionsfähige Arbeitsgüte',
+                    2: 'lieferte solide Arbeitsergebnisse, die bei genauerer Kontrolle kleinere Nacharbeiten erforderten',
+                    3: 'stellte qualitativ ordentliche und verwertbare Arbeitsergebnisse ohne gravierende Mängel her',
+                    4: 'überzeugte durch eine sehr sorgfältige und saubere Ausführung der übertragenen Werkstücke',
+                    5: 'lieferte konstant hochwertige und fehlerfreie Arbeitsergebnisse von gehobenem Niveau'
+                }
+            },
+            {
+                id: 'temp',
+                name: '4. Arbeitstempo',
+                desc: 'Geschwindigkeit und Ökonomie bei der Bewältigung der Arbeitsaufgaben.',
+                levels: {
+                    1: 'arbeite in einem sehr rücksichtsvollen, stark verlangsamten Tempo mit individuellem Rhythmus',
+                    2: 'zeigte ein angepasstes, wenn auch zeitweise leicht gedrosseltes Arbeitstempo',
+                    3: 'bewältigte die Aufgaben in einem angemessenen und gleichmäßigen Tempo',
+                    4: 'hielt ein zügiges und wirtschaftliches Arbeitstempo über den gesamten Zeitraum aufrecht',
+                    5: 'zeigte ein überdurchschnittlich flottes und sehr effizientes Arbeitstempo'
+                }
+            },
+            {
+                id: 'koop',
+                name: '5. Kooperation & Sozialverhalten',
+                desc: 'Interaktion mit Therapeuten, Mitpatienten und Einbindung in die Arbeitsgruppe.',
+                levels: {
+                    1: 'wahrte in der Gruppe einen distanzierten, aber korrekten Umgang und benötigte klare soziale Leitplanken',
+                    2: 'beteiligte sich ruhig am Gruppengeschehen und kooperierte bei direkter Ansprache verlässlich',
+                    3: 'agierte sozial angepasst, pflegte einen guten Kontakt zu Mitpatienten und stimmte sich konstruktiv ab',
+                    4: 'integrierte sich aktiv in das Team und unterstützte Mitpatienten in arbeitsbezogenen Situationen',
+                    5: 'zeigte ein vorbildliches, verbindliches und sozial äußerst stabiles Verhalten in der Gruppe'
+                }
+            }
+        ];
+      const melbaCriteriaPart2 = [
+            {
+                id: 'krit',
+                name: '6. Kritik- & Annahmefähigkeit',
+                desc: 'Umgang mit fachlichen Hinweisen, Korrekturen und Rückmeldungen.',
+                levels: {
+                    1: 'nahm sachliche Korrekturen nach anfänglichem Zögern und reflexivem Innehalten an',
+                    2: 'akzeptierte fachliche Hinweise konstruktiv, sofern diese ruhig und wertschätzend vermittelt wurden',
+                    3: 'ging mit konstruktiver Kritik offen um und setzte besprochene Korrekturen direkt um',
+                    4: 'reflektierte eigene Arbeitsfehler selbstständig und nahm Rückmeldungen als wertvollen Lernimpuls an',
+                    5: 'zeigte eine ausgeprägte und vorbildliche Einsichtsfähigkeit bei fachlichen Korrekturen'
+                }
+            },
+            {
+                id: 'sich',
+                name: '7. Sicherheits- & Regelbewusstsein',
+                desc: 'Einhaltung von Arbeitsschutz, Sicherheitsvorgaben und Stationsregeln.',
+                levels: {
+                    1: 'beachtete die grundlegenden Sicherheitsregeln nach wiederholter Erinnerung und unter Aufsicht',
+                    2: 'hielt die vorgegebenen Arbeitsschutz- und Stationsregeln im Stationsalltag überwiegend ein',
+                    3: 'beachtete Sicherheitsvorschriften verlässlich und ging verantwortungsvoll mit Geräten um',
+                    4: 'zeigte ein hohes Gefahrenbewusstsein und achtete aktiv auf die Einhaltung von Sicherheitsstandards',
+                    5: 'agierte in sicherheitsrelevanten Bereichen vorbildlich, umsichtig und absolut verlässlich'
+                }
+            },
+            {
+                id: 'ordnung',
+                name: '8. Ordnung & Arbeitsplatzpflege',
+                desc: 'Pflege von Werkzeugen, Maschinen und Sauberkeit am Arbeitsplatz.',
+                levels: {
+                    1: 'hielt den Arbeitsplatz mit unterstützenden Hinweisen in einem funktionalen Zustand',
+                    2: 'räumte den Arbeitsplatz nach Aufforderung auf und pflegte die Werkzeuge ordnungsgemäß',
+                    3: 'verließ den Arbeitsplatz sauber, aufgeräumt und übergab die Werkzeuge in gutem Zustand',
+                    4: 'zeigte einen ausgeprägten Sinn für Ordnung und übernahm zusätzliche Pflegeaufgaben',
+                    5: 'wachte eigenverantwortlich über die perfekte Sauberkeit und Materialpflege im Arbeitsbereich'
+                }
+            },
+            {
+                id: 'frust',
+                name: '9. Frustrationstoleranz & Belastbarkeit',
+                desc: 'Umgang mit Misserfolgen, technischen Schwierigkeiten oder emotionaler Anspannung.',
+                levels: {
+                    1: 'zeigte bei technischen Hürden eine spürbare Frustration, ließ sich jedoch durch beruhigende Ansprache stabilisieren',
+                    2: 'bewältigte kleinere Misserfolge bei sachlicher Begleitung ohne gravierende emotionale Einbrüche',
+                    3: 'ging mit auftretenden Schwierigkeiten gelassen um und blieb auch bei Verzögerungen arbeitsfähig',
+                    4: 'blieb in stressigen oder schwierigen Situationen souverän und lösungsorientiert',
+                    5: 'meisterte unerwartete Belastungen mit bemerkenswerter emotionaler Stabilität und Ausgeglichenheit'
+                }
+            }
+        ];
+
+        // Alle Kriterien zusammenführen
+        const allCriteria = [...melbaCriteria, ...melbaCriteriaPart2];
+
+        let currentMode = 'kis'; // 'kis' oder 'long'
+
+        function toggleReportMode() {
+            currentMode = currentMode === 'kis' ? 'long' : 'kis';
+            const btn = document.getElementById('modeToggle');
+            if (currentMode === 'kis') {
+                btn.textContent = 'Modus: 14-Tage-Kurzbericht (KIS)';
+                btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm';
+            } else {
+                btn.textContent = 'Modus: Ausführlicher Langbericht';
+                btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm';
+            }
+            generateReport();
+        }
+
+        // UI für Kriterien dynamisch aufbauen
+        function renderMelbaUI() {
+            const container = document.getElementById('melbaContainer');
+            container.innerHTML = '';
+            allCriteria.forEach(crit => {
+                let html = `
+                    <div class="bg-slate-900/60 border border-slate-700/60 rounded-xl p-3.5 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <span class="text-xs font-bold text-indigo-400">${crit.name}</span>
+                                <p class="text-[11px] text-slate-400">${crit.desc}</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-5 gap-1.5 pt-1">
+                `;
+                for (let i = 1; i <= 5; i++) {
+                    html += `
+                        <button type="button" onclick="selectLevel('${crit.id}', ${i})" id="btn-${crit.id}-${i}" class="level-btn-${crit.id} py-1.5 px-1 rounded text-[11px] font-medium border border-slate-700 bg-slate-800 text-slate-300 hover:border-indigo-500 transition text-center truncate">
+                            Stufe ${i}
+                        </button>
+                    `;
+                }
+                html += `</div></div>`;
+                container.innerHTML += html;
+            });
+        }
+      // Status der ausgewählten Stufen (Standard: Stufe 3 für alle)
+        let selectedLevels = {};
+        allCriteria.forEach(crit => selectedLevels[crit.id] = 3);
+
+        function selectLevel(critId, level) {
+            selectedLevels[critId] = level;
+            // Visuelles Feedback für Buttons
+            for (let i = 1; i <= 5; i++) {
+                const btn = document.getElementById(`btn-${critId}-${i}`);
+                if (i === level) {
+                    btn.className = `level-btn-${critId} py-1.5 px-1 rounded text-[11px] font-semibold border border-indigo-500 bg-indigo-600 text-white transition text-center truncate shadow-sm`;
+                } else {
+                    btn.className = `level-btn-${critId} py-1.5 px-1 rounded text-[11px] font-medium border border-slate-700 bg-slate-800 text-slate-300 hover:border-indigo-500 transition text-center truncate`;
+                }
+            }
+            generateReport();
+        }
+
+        // Intelligente Generierungs-Logik mit KIS-Verschachtelung & Inversion
+        function generateReport() {
+            const name = document.getElementById('patientName').value.trim() || 'Der Patient';
+            const period = document.getElementById('reportPeriod').value.trim();
+            const periodText = period ? `im Berichtszeitraum vom ${period}` : 'im aktuellen Berichtszeitraum';
+
+            let reportText = '';
+
+            if (currentMode === 'kis') {
+                // KIS-Modus: Kompakte semantische Verschachtelung (2-3 flüssige Sätze)
+                let cKontext = selectedLevels['konz'];
+                let cArbeit = selectedLevels['anw'];
+                let cTempo = selectedLevels['temp'];
+                let cKoop = selectedLevels['koop'];
+                let cFrust = selectedLevels['frust'];
+
+                // Satz 1: Arbeits- und Leistungskern (Kombination aus Konzentration, Durchführung und Tempo)
+                let part1 = `Im Berichtszeitraum zeigte ${name} ${allCriteria.find(c=>c.id==='konz').levels[cKontext]}, setzte Arbeitsaufträge ${allCriteria.find(c=>c.id==='anw').levels[cArbeit]} um und bewältigte die Aufgaben ${allCriteria.find(c=>c.id==='temp'].levels[cTempo]}.`;
+                
+                // Satz 2: Sozial- und Regelverhalten (Kooperation, Frustration, Sicherheit)
+                let part2 = `Im sozialen Miteinander ${allCriteria.find(c=>c.id==='koop').levels[cKoop]}, ging mit auftretenden Hürden ${allCriteria.find(c=>c.id==='frust').levels[cFrust]} um und hielt die Sicherheits- sowie Ordnungsregeln verlässlich ein.`;
+
+                reportText = `${name} befand sich ${periodText} in der Arbeitstherapie. ${part1} ${part2}`;
+            } else {
+                // Langbericht-Modus: Ausführliche Einzeldarstellung aller 9 Kriterien
+                reportText = `${name} befand sich ${periodText} in der ergotherapeutischen Behandlung im Rahmen des Maßregelvollzugs nach § 63 StGB.\n\n`;
+                
+                allCriteria.forEach((crit, index) => {
+                    let lvl = selectedLevels[crit.id];
+                    let textSegment = crit.levels[lvl];
+                    reportText += `• Bezüglich des Bereichs ${crit.name.split('. ')[1]} ${textSegment}.\n`;
+                });
+                
+                reportText += `\nZusammenfassend stabilisiert sich ${name} im Stations- und Arbeitstherapiegeschehen zunehmend im vereinbarten Rahmen.`;
+            }
+
+            // Text in Textarea schreiben
+            document.getElementById('reportOutput').value = reportText;
+            updateWordCount();
+        }
+
+        function updateWordCount() {
+            const text = document.getElementById('reportOutput').value;
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            const chars = text.length;
+            document.getElementById('wordCountBadge').textContent = `${words} Wörter | ${chars} Zeichen`;
+        }
+
+        function copyReport() {
+            const textarea = document.getElementById('reportOutput');
+            textarea.select();
+            document.execCommand('copy');
+            // Kurzes visuelles Feedback
+            const btn = event.currentTarget;
+            const originalText = btn.textContent;
+            btn.textContent = 'Kopiert!';
+            setTimeout(() => btn.textContent = originalText, 1500);
+        }
+
+        function resetAll() {
+            document.getElementById('patientName').value = '';
+            document.getElementById('reportPeriod').value = '';
+            allCriteria.forEach(crit => selectLevel(crit.id, 3));
+            generateReport();
+        }
+
+        // Initialisierung beim Laden
+        window.onload = function() {
+            renderMelbaUI();
+            // Standardmäßig überall Stufe 3 setzen für den Start
+            allCriteria.forEach(crit => {
+                const btn = document.getElementById(`btn-${crit.id}-3`);
+                if(btn) btn.className = `level-btn-${crit.id} py-1.5 px-1 rounded text-[11px] font-semibold border border-indigo-500 bg-indigo-600 text-white transition text-center truncate shadow-sm`;
+            });
+            document.getElementById('reportOutput').addEventListener('input', updateWordCount);
+            generateReport();
+        };
+    </script>
+</body>
+</html>
