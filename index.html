@@ -1,243 +1,706 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Forensische Dokumentations-Engine (MRV § 63)</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-  </style>
+    <meta charset="UTF-8">
+    <title>Modulare Forensische AT-Doku-Engine (MELBA)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { 
+            --primary: #0f172a; 
+            --secondary: #6366f1; 
+            --bg: #0f172a; 
+            --card-border: #334155;
+            --accent-active: #4f46e5;
+        }
+        body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 16px; background-color: var(--bg); color: #f8fafc; line-height: 1.5; }
+        .wrapper { max-width: 1300px; margin: 0 auto; background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
+        h1 { color: #f1f5f9; border-bottom: 2px solid var(--secondary); padding-bottom: 8px; font-size: 20px; margin-top: 0; }
+        h2 { color: #cbd5e1; font-size: 12px; margin-top: 15px; border-bottom: 1px solid #334155; padding-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        /* Globale Steuerung oben */
+        .patient-config { display: grid; grid-template-columns: 2fr 1fr 1fr 2fr; gap: 12px; background: #0f172a; padding: 12px; border-radius: 8px; border: 1px solid #334155; margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 11px; color: #94a3b8; }
+        .form-group input, .form-group select { width: 100%; padding: 7px; background: #1e293b; border: 1px solid #475569; color: #f8fafc; border-radius: 6px; box-sizing: border-box; font-size: 12px; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--secondary); }
+        
+        .grid-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .card { background: #1e293b; border: 1px solid var(--card-border); padding: 12px; border-radius: 8px; }
+        
+        /* Modulare Zeilensteuerung mit Opt-In-Checkboxen */
+        .control-row { display: flex; flex-direction: column; padding: 10px; border: 1px solid #334155; border-radius: 6px; margin-bottom: 10px; background: #0f172a; transition: all 0.2s; }
+        .control-row.disabled { background: #0f172a; opacity: 0.45; }
+        .row-header { display: flex; align-items: center; justify-content: space-between; font-weight: bold; font-size: 12px; margin-bottom: 4px; color: #e2e8f0; }
+        .left-meta { display: flex; align-items: center; gap: 8px; }
+        .opt-in-check { transform: scale(1.1); cursor: pointer; accent-color: var(--secondary); }
+        .badge { background: #334155; padding: 2px 6px; border-radius: 8px; font-size: 10px; color: #cbd5e1; }
+        .desc-text { font-size: 10px; color: #94a3b8; margin-bottom: 6px; padding-left: 22px; }
+        
+        /* Slider-Styling */
+        .slider-wrapper { display: flex; align-items: center; gap: 8px; padding-left: 22px; }
+        .slider { flex-grow: 1; -webkit-appearance: none; width: 100%; height: 5px; border-radius: 3px; background: #475569; outline: none; }
+        .slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--secondary); cursor: pointer; }
+        .slider:disabled::-webkit-slider-thumb { background: #64748b; cursor: not-allowed; }
+        .val-indicator { font-weight: bold; width: 20px; text-align: right; color: #818cf8; font-size: 12px; }
+        .control-row.disabled .val-indicator { color: #64748b; }
+        
+        /* Sticky-Panel unten für die Textausgabe */
+        .output-panel { position: sticky; bottom: 10px; background: #1e293b; border: 2px solid var(--secondary); padding: 12px; border-radius: 8px; box-shadow: 0 -5px 20px rgba(0,0,0,0.4); margin-top: 20px; }
+        textarea { width: 100%; height: 110px; padding: 10px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; border-radius: 6px; font-size: 13px; box-sizing: border-box; resize: vertical; font-family: monospace; line-height: 1.4; }
+        textarea:focus { outline: none; border-color: var(--secondary); }
+        .actions { display: flex; gap: 10px; margin-top: 8px; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; text-transform: uppercase; transition: background 0.2s; }
+        .btn-success { background: var(--secondary); color: white; flex-grow: 2; }
+        .btn-success:hover { background: #4f46e5; }
+        .btn-shuffle { background: #7c3aed; color: white; flex-grow: 2; }
+        .btn-shuffle:hover { background: #6d28d9; }
+        .btn-reset { background: #475569; color: white; width: 90px; }
+        .btn-reset:hover { background: #334155; }
+    </style>
 </head>
-<body class="min-h-screen flex flex-col">
-  <header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto flex justify-between items-center">
-      <div>
-        <h1 class="text-xl font-bold tracking-tight text-slate-100">MRV Doku-Engine <span class="text-xs px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full border border-emerald-500/30">v2.0 KIS-Optimiert</span></h1>
-        <p class="text-xs text-slate-400">Forensische Arbeitstherapie – Maßregelvollzug § 63 StGB</p>
-      </div>
-      <div class="flex items-center space-x-3">
-        <span class="text-xs text-slate-400 font-medium">Modus:</span>
-        <button id="modeToggle" onclick="toggleReportMode()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm">
-          Modus: 14-Tage-Kurzbericht (KIS)
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <main class="max-w-7xl mx-auto flex-1 w-full p-4 grid grid-cols-1 lg:grid-cols-12 gap-6 my-4">
-    <!-- Linke Spalte: Bedienung & Auswahl -->
-    <div class="lg:col-span-7 space-y-6">
-      <!-- Stammdaten -->
-      <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-4 shadow-lg">
-        <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider mb-3">1. Stammdaten & Zeitraum</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">Name des Patienten</label>
-            <input type="text" id="patientName" oninput="generateReport()" placeholder="z. B. Herr M." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
-          </div>
-          <div>
-            <label class="block text-xs text-slate-400 mb-1">Berichtszeitraum / Intervall</label>
-            <input type="text" id="reportPeriod" oninput="generateReport()" placeholder="z. B. 01.10.2026 – 14.10.2026" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
-          </div>
+<body>
+<div class="wrapper">
+    <h1>Modulare Forensische AT-Doku-Engine (Metallwerkstatt als Erprobungsrahmen)</h1>
+    
+    <div class="patient-config">
+        <div class="form-group">
+            <label>Patienten-Kürzel / Name</label>
+            <input type="text" id="pName" value="Herr M." oninput="processGeneration()">
         </div>
-      </div>
-
-      <!-- MELBA Kriterien Container -->
-      <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-4 shadow-lg">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">2. MELBA-Leistungsprofil & Verhaltensbeurteilung</h2>
-          <span class="text-xs px-2.5 py-1 bg-slate-700 text-slate-300 rounded-full font-medium" id="kriterienCount">6 Kriterien aktiv</span>
+        <div class="form-group">
+            <label>Pronomen / Bezug</label>
+            <select id="pPronoun" onchange="processGeneration()">
+                <option value="Er">Er (männlich)</option>
+                <option value="Sie">Sie (weiblich)</option>
+                <option value="Der Patient">Der Patient (neutral)</option>
+            </select>
         </div>
-
-        <div id="criteriaContainer" class="space-y-4">
-          <!-- Dynamisch generierte Kriterien-Karten -->
+        <div class="form-group">
+            <label>Wochen-Einleitung</label>
+            <select id="pWeek" onchange="processGeneration()">
+                <option value="0">Keine Nennung der Woche</option>
+                <option value="1">In dieser Arbeitswoche</option>
+                <option value="2">In der aktuellen Woche</option>
+                <option value="3">Im Verlauf dieser Woche</option>
+                <option value="4">Während der Erprobungswoche</option>
+            </select>
         </div>
-      </div>
+        <div class="form-group">
+            <label>Max. Textlänge (Wörter): <span id="wLimitVal">90</span></label>
+            <input type="range" id="pTextLimit" min="40" max="150" value="90" step="5" style="width:100%; margin-top:6px; accent-color: var(--secondary);" oninput="document.getElementById('wLimitVal').innerText=this.value; processGeneration();">
+        </div>
     </div>
 
-    <!-- Rechte Spalte: Berichtsvorschau -->
-    <div class="lg:col-span-5 flex flex-col h-full space-y-4">
-      <div class="bg-slate-800/80 border border-slate-700/60 rounded-xl p-4 shadow-lg flex-1 flex flex-col">
-        <div class="flex justify-between items-center mb-3">
-          <div>
-            <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">3. Berichtsvorschau</h2>
-            <p class="text-xs text-slate-400" id="statsText">0 Wörter | 0 Zeichen</p>
-          </div>
-          <div class="flex space-x-2">
-            <button onclick="copyToClipboard()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition flex items-center shadow">
-              Kopieren
-            </button>
-            <button onclick="resetForm()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-semibold transition">
-              Zurücksetzen
-            </button>
-          </div>
+    <div class="grid-panel">
+        <div class="card">
+            <h2>1. Kognition & Arbeitsausführung</h2>
+            
+            <div class="control-row disabled" id="row_konz">
+                <div class="row-header">
+                    <div class="left-meta">
+                        <input type="checkbox" class="opt-in-check" id="chk_konz" onchange="toggleRow('konz'); processGeneration();">
+                        <span>Konzentration & Aufmerksamkeit (M1)</span>
+                    </div>
+                    <span class="badge">Ablenkung & Fokus</span>
+                </div>
+                <span class="desc-text">Zwischenmenschliche Ablenkbarkeit, Aufrechterhaltung des Fokus bei Frust, Durchhaltevermögen</span>
+                <div class="slider-wrapper">
+                    <input type="range" class="slider" id="m_konz" min="1" max="5" value="3" disabled oninput="updateValIndicator(this); processGeneration();">
+                    <span class="val-indicator" id="m_konz_val">3</span>
+                </div>
+            </div>
+
+            <div class="control-row disabled" id="row_anw">
+                <div class="row-header">
+                    <div class="left-meta">
+                        <input type="checkbox" class="opt-in-check" id="chk_anw" onchange="toggleRow('anw'); processGeneration();">
+                        <span>Umgang mit Vorgaben & Anleitung (M5)</span>
+                    </div>
+                    <span class="badge">Compliance</span>
+                </div>
+                <span class="desc-text">Umsetzung von therapeutischen Vereinbarungen, Akzeptanz von Arbeitsstrukturen</span>
+                <div class="slider-wrapper">
+                    <input type="range" class="slider" id="m_anw" min="1" max="5" value="3" disabled oninput="updateValIndicator(this); processGeneration();">
+                    <span class="val-indicator" id="m_anw_val">3</span>
+                </div>
+            </div>
+
+            <div class="control-row disabled" id="row_qual">
+                <div class="row-header">
+                    <div class="left-meta">
+                        <input type="checkbox" class="opt-in-check" id="chk_qual" onchange="toggleRow('qual'); processGeneration();">
+                        <span>Sorgfalt & Genauigkeit (M12)</span>
+                    </div>
+                    <span class="badge">Arbeitsqualität</span>
+                </div>
+                <span class="desc-text">Präzisionsanspruch als Spiegel der inneren Strukturierung, Flüchtigkeit vs. Übergenauigkeit</span>
+                <div class="slider-wrapper">
+                    <input type="range" class="slider" id="m_qual" min="1" max="5" value="3" disabled oninput="updateValIndicator(this); processGeneration();">
+                    <span class="val-indicator" id="m_qual_val">3</span>
+                </div>
+            </div>
+
+            <div class="control-row disabled" id="row_temp">
+                <div class="row-header">
+                    <div class="left-meta">
+                        <input type="checkbox" class="opt-in-check" id="chk_temp" onchange="toggleRow('temp'); processGeneration();">
+                        <span>Arbeitsgeschwindigkeit (M14)</span>
+                    </div>
+                    <span class="badge">Antrieb & Dynamik</span>
+                </div>
+                <span class="desc-text">Umgang mit Leistungsdruck, Verlangsamung bei Anspannung oder hektischer Aktivismus</span>
+                <div class="slider-wrapper">
+                    <input type="range" class="slider" id="m_temp" min="1" max="5" value="3" disabled oninput="updateValIndicator(this); processGeneration();">
+                    <span class="val-indicator" id="m_temp_val">3</span>
+                </div>
+            </div>
         </div>
-
-        <textarea id="reportOutput" class="w-full flex-1 bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 custom-scrollbar resize-none font-mono leading-relaxed" placeholder="Der generierte Bericht erscheint hier automatisch nach Auswahl der Parameter..."></textarea>
-      </div>
-
-      <div class="bg-slate-800/40 border border-slate-700/40 rounded-xl p-3 text-xs text-slate-400">
-        <p><strong class="text-slate-300">Hinweis:</strong> Im KIS-Modus werden die Merkmale intelligent zu kompakten Sätzen verschmolzen. Manuelle Korrekturen sind direkt im Textfeld möglich.</p>
-      </div>
-    </div>
-  </main>
-
-  <script>
-    const criteriaData = [
-      { id: 'puenktlichkeit', name: 'Pünktlichkeit & Absprachen', desc: 'Einhaltung von Zeiten und Arbeitsabsprachen', options: [
-        { label: 'Zuverlässig / Pünktlich', text: 'erschien stets pünktlich sowie zuverlässig zu den angesetzten Therapiezeiten' },
-        { label: 'Vereinzelte Verspätung', text: 'zeigte vereinzelt leichte Verspätungen, war jedoch nach Ansprache kooperativ' },
-        { label: 'Unentschuldigt fehlend', text: 'wies unentschuldigte Fehlzeiten auf und benötigte verstärkte Aufforderung' }
-      ]},
-      { id: 'sorgfalt', name: 'Sorgfalt & Ausführung', desc: 'Genauigkeit und Ausführungsqualität bei Werkstücken', options: [
-        { label: 'Sehr sorgfältig / Präzise', text: 'arbeitete durchgehend sorgfältig, präzise und gemäß Vorgaben' },
-        { label: 'Zufriedenstellend', text: 'führte zugewiesene Aufgaben zufriedenstellend und solide aus' },
-        { label: 'Flüchtig / Nacharbeit nötig', text: 'zeigte eine flüchtige Arbeitsweise, die Nachkorrekturen erforderte' }
-      ]},
-      { id: 'ausdauer', name: 'Ausdauer & Belastbarkeit', desc: 'Durchhaltevermögen bei monotonen/komplexen Arbeiten', options: [
-        { label: 'Konstant hoch', text: 'zeigte eine konstant hohe Ausdauer und Belastbarkeit über den Gesamteinsatz' },
-        { label: 'Mäßig / Tagesformabhängig', text: 'wies eine tagesformabhängige Belastbarkeit mit Pausenbedarf auf' },
-        { label: 'Rasche Ermüdung', text: 'zeigte rasche Ermüdungserscheinungen bei länger andauernden Sequenzen' }
-      ]},
-      { id: 'selbststaendigkeit', name: 'Selbstständigkeit', desc: 'Eigenständiges Umsetzen von Arbeitsanweisungen', options: [
-        { label: 'Vollständig eigenständig', text: 'arbeitete weitgehend selbstständig und strukturierte eigene Arbeitsschritte' },
-        { label: 'Teilweise Anleitung', text: 'benötigte bei neuen Arbeitsfolgen gelegentliche Anleitung und Rückversicherung' },
-        { label: 'Enge Anleitung erforderlich', text: 'bedurfte einer durchgehenden engmaschigen Begleitung und Schritt-für-Schritt-Anleitung' }
-      ]},
-      { id: 'sozialverhalten', name: 'Sozialverhalten & Gruppe', desc: 'Umgang mit Mitpatienten und Gruppenklima', options: [
-        { label: 'Freundlich / Integriert', text: 'verhielt sich im Gruppengeschehen stets freundlich, hilfsbereit und konstruktiv' },
-        { label: 'Unauffällig / Zurückhaltend', text: 'verhielt sich in der Arbeitsgruppe unauffällig und eher zurückgezogen' },
-        { label: 'Konflikthaft / Distanzlos', text: 'zeigte phasenweise distanzlose oder konflikthafte Verhaltensweisen gegenüber Mitpatienten' }
-      ]},
-      { id: 'regelakzeptanz', name: 'Regelakzeptanz & Sicherheit', desc: 'Einhaltung der Arbeitsschutz- und Stationsregeln', options: [
-        { label: 'Vorbildlich', text: 'hielt Sicherheits- und Werkstattregeln jederzeit vorbildlich ein' },
-        { label: 'Nach Erinnerung korrigierbar', text: 'benötigte vereinzelt Hinweise zur Einhaltung der Unfallverhütungsvorschriften' },
-        { label: 'Regelverstöße', text: 'missachtete Sicherheitsvorgaben und musste nachdrücklich ermahnt werden' }
-      ]}
-    ];
-
-    let isShortReportMode = true;
-
-    function renderCriteria() {
-      const container = document.getElementById('criteriaContainer');
-      let htmlContent = '';
-      
-      for (let i = 0; i < criteriaData.length; i++) {
-        let item = criteriaData[i];
-        htmlContent += '<div class="bg-slate-900/60 border border-slate-700/50 rounded-lg p-3 space-y-2">';
-        htmlContent += '<div class="flex justify-between items-center"><span class="text-xs font-bold text-indigo-300 uppercase tracking-wide">' + item.name + '</span><span class="text-[10px] text-slate-400">' + item.desc + '</span></div>';
-        htmlContent += '<div class="grid grid-cols-1 sm:grid-cols-3 gap-2">';
         
-        for (let j = 0; j < item.options.length; j++) {
-          let opt = item.options[j];
-          htmlContent += '<button type="button" id="btn-' + item.id + '-' + j + '" onclick="selectOption(\'' + item.id + '\', ' + j + ')" class="criterion-btn text-left text-xs p-2 rounded-md border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-500 transition">' + opt.label + '</button>';
+        <div class="card">
+            <h2>2. Sozialverhalten & Forensische Sicherheit</h2>
+
+            <div class="control-row disabled" id="row_koop">
+                <div class="row-header">
+                    <div class="left-meta">
+                        <input type="checkbox" class="opt-in-check" id="chk_koop" onchange="toggleRow('koop'); processGeneration();">
+                        <span>Kooperationsfähigkeit (M18)</span>
+                    </div>
+                    <span class="badge">Gruppenverhalten</span>
+                </div>
+                <span class="desc-text">Zwischenmenschliche Absprachen an Gemeinschaftsarbeitsplätzen</span>
+                <div class="slider-wrapper">
+                    <input type="range" class="slider" id="m_koop" min="1" max="5" value="3" disabled oninput="updateValIndicator(this); processGeneration();">
+                    <span class="val-indicator" id="m_koop_val">3</span>
+                </div>
+            </div>
+
+            <div class="control-row disabled" id="row_krit">
+                <div class="row-header">
+                    <div class="left-meta">
+                        <input type="checkbox" class="opt-in-check" id="chk_krit" onchange="toggleRow('krit'); processGeneration();">
+                        <span>Umgang mit Therapeuten & Hierarchie (M19)</span>
+                    </div>
+                    <span class="badge">Kritikfähigkeit</span>
+                </div>
+                <span class="desc-text">Reaktion auf Grenzsetzungen, Einordnung in strukturelle Abläufe</span>
+                <div class="slider-wrapper">
+                    <input type="range" class="slider" id="m_krit" min="1" max="5" value="3" disabled oninput="updateValIndicator(this); processGeneration();">
+                    <span class="val-indicator" id="m_krit_val">3</span>
+                </div>
+            </div>
+
+            <div class="control-row disabled" id="row_sich">
+                <div class="row-header">
+                    <div class="left-meta">
+                        <input type="checkbox" class="opt-in-check" id="chk_sich" onchange="toggleRow('sich'); processGeneration();">
+                        <span>Gefahrenbewusstsein & PSA (M28)</span>
+                    </div>
+                    <span class="badge">Arbeitsschutz</span>
+                </div>
+                <span class="desc-text">Eigenverantwortlicher Schutz und Rücksicht auf die Umgebung</span>
+                <div class="slider-wrapper">
+                    <input type="range" class="slider" id="m_sich" min="1" max="5" value="3" disabled oninput="updateValIndicator(this); processGeneration();">
+                    <span class="val-indicator" id="m_sich_val">3</span>
+                </div>
+            </div>
+
+            <div class="control-row disabled" id="row_ordnung">
+                <div class="row-header">
+                    <div class="left-meta">
+                        <input type="checkbox" class="opt-in-check" id="chk_ordnung" onchange="toggleRow('ordnung'); processGeneration();">
+                        <span>Forensische Compliance (M29)</span>
+                    </div>
+                    <span class="badge">Werkzeugordnung</span>
+                </div>
+                <span class="desc-text">Zuverlässigkeit beim Zählappell, Haltung zur strikten Einhaltung</span>
+                <div class="slider-wrapper">
+                    <input type="range" class="slider" id="m_ordnung" min="1" max="5" value="3" disabled oninput="updateValIndicator(this); processGeneration();">
+                    <span class="val-indicator" id="m_ordnung_val">3</span>
+                </div>
+            </div>
+
+            <div class="control-row disabled" id="row_frust">
+                <div class="row-header">
+                    <div class="left-meta">
+                        <input type="checkbox" class="opt-in-check" id="chk_frust" onchange="toggleRow('frust'); processGeneration();">
+                        <span>Affektregulation bei Frust (M30)</span>
+                    </div>
+                    <span class="badge">Impulskontrolle</span>
+                </div>
+                <span class="desc-text">Verhaltensstabilität bei handwerklichen Rückschlägen oder Fehlern</span>
+                <div class="slider-wrapper">
+                    <input type="range" class="slider" id="m_frust" min="1" max="5" value="3" disabled oninput="updateValIndicator(this); processGeneration();">
+                    <span class="val-indicator" id="m_frust_val">3</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="output-panel">
+        <label style="font-weight: bold; color: #94a3b8; display:block; margin-bottom: 4px; font-size:11px;">Dynamisch generierter Verlaufsbericht (Fließtext aus ausgewählten Modulen):</label>
+        <textarea id="reportOutput" readonly placeholder="Aktivieren Sie oben die Kontrollkästchen der gewünschten Module, um den Bericht live zu erstellen..."></textarea>
+        <div class="actions">
+            <button class="btn btn-success" onclick="copyToClipboard()">📋 Text kopieren</button>
+            <button class="btn btn-shuffle" onclick="processGeneration()">🎲 Satzbau neu mischen</button>
+            <button class="btn btn-reset" onclick="resetMatrix()">Reset</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const lEngine = {
+    konz: {
+        1: {
+            sub: ["wies eine akute zwischenmenschliche Ablenkbarkeit auf", "konnte den Blick kaum fokussiert am eigenen Platz halten", "wirkte im Werkstattraum kognitiv sehr fragmentiert"],
+            verb: ["und ließ sich durch jedes minimale Geräusch sofort aus dem Konzept bringen,", "schweifte gedanklich permanent zu den Mitpatienten ab,", "reagierte hochgradig instabil auf äußere Reize im Raum,"],
+            obj: ["sodass die geplante Wochenarbeit unvollständig verblieb.", "weshalb engmaschig steuernd eingegriffen werden musste.", "was die Eigensteuerung massiv einschränkte."]
+        },
+        2: {
+            sub: ["zeigte ein deutlich schwankendes Aufmerksamkeitsfenster", "ließ zeitweise die nötige Ausdauer bei der Arbeit vermissen", "wies ein fluktuierendes Konzentrationsniveau auf"],
+            verb: ["und benötigte regelmäßige verbale Strukturierungshilfen,", "wobei der Fokus bei ungeliebten Aufgaben immer wieder abriss,", "ließ sich ab und zu durch das Geschehen auf der Nachbarwerkbank ablenken,"],
+            obj: ["fand nach therapeutischer Ansprache aber wieder in die Spur.", "sodass flüchtigkeitsbedingte Fehler entstanden.", "stabilisierte den Arbeitsfokus jedoch nach einer kurzen Pause."]
+        },
+        3: {
+            sub: ["arbeitete mit einer durchgehend soliden und ausdauernden Aufmerksamkeit", "blieb fokussiert an der zugewiesenen Werkbank", "behielt den Fokus fehlerfrei auf der eigenen Aufgabe"],
+            verb: ["und zog die vereinbarten Abschnitte fließend durch,", "wobei das allgemeine Werkstattrauschen gut ausgeblendet wurde,", "folgte den Abläufen kontinuierlich und ruhig,"],
+            obj: ["was einem stabilen und unauffälligen Standard entspricht.", "sodass keine vorzeitige Ermüdung feststellbar war.", "wie es für den strukturierten Ablauf vorgegeben ist."]
+        },
+        4: {
+            sub: ["arbeitete mit einem überaus starken und zähen Fokus", "demonstrierte eine bemerkenswerte kognitive Ausdauer", "wies eine überdurchschnittliche Detailkonzentration auf"],
+            verb: ["und ließ sich auch von unruhigen Mitpatienten nicht ablenken,", "wobei selbst monotone Arbeitsgänge mit hoher Ausdauer liefen,", "blieb über Stunden hinweg vollkommen vertieft in der Aufgabe,"],
+            obj: ["was eine hohe psychische Stabilität im Alltag zeigt.", "ohne dass die Aufmerksamkeit im Verlauf nachließ.", "und lieferte ein qualitativ makelloses Ergebnis ab."]
+        },
+        5: {
+            sub: ["verfiel bei der Arbeit in einen extremen Hyperfokus", "zeigte eine fast schon starre Fixierung auf die Aufgabe", "konzentrierte sich so intensiv auf die Verlaufsabschnitte"],
+            verb: ["und blendete die gesamte Umgebung vollkommen aus,", "dass therapeutische Ansprachen erst verzögert anbelangten,", "dass Pausenzeiten eigenständig komplett ignoriert wurden,"],
+            obj: ["was im Wochenverlauf zu spürbarer Erschöpfung führte.", "sodass hier aktiv gebremst werden musste.", "was klinisch im Auge behalten werden muss."]
         }
-        
-        htmlContent += '</div></div>';
-      }
-      container.innerHTML = htmlContent;
+    },
+    anw: {
+        1: {
+            sub: ["verweigerte die Umsetzung der therapeutischen Vorgaben", "reagierte mit offener Abwehr auf die Absprachen", "wich komplett eigenmächtig von den Regeln ab"],
+            verb: ["und setzte den Arbeitsauftrag absichtlich falsch um,", "ignorierte die Strukturen auf dem Arbeitsplatz völlig,", "wollte keinerlei fachliche Anleitung annehmen,"],
+            obj: ["sodass das Vertrauensverhältnis stark belastet wurde.", "was einen sofortigen Abbruch der Einheit zur Folge hatte.", "und blockierte damit den therapeutischen Fortschritt."]
+        },
+        2: {
+            sub: ["hatte sichtbare Mühe mit dem Verständnis von Regeln", "benötigte mehrfache, sehr einfache Erklärungen", "tat sich beim Umdenken von Anleitung auf Praxis schwer"],
+            verb: ["und forderte permanente Rückversicherungen ein,", "setzte die Schritte erst nach wiederholtem Erläutern um,", "brauchte kleinschrittige Hilfestellungen beim Einstieg,"],
+            obj: ["bevor eine eigenständige Umsetzung gewagt wurde.", "kam dann aber langsam voran.", "um Fehler im Vorfeld rechtzeitig zu vermeiden."]
+        },
+        3: {
+            sub: ["setzte die therapeutischen Vorgaben verlässlich um", "übertrug die Absprachen fehlerfrei auf die Praxis", "folgte der vorgegebenen Schrittfolge ganz genau"],
+            verb: ["und hielt sich präzise an die vereinbarten Strukturen,", "wobei die Arbeitsstruktur richtig verstanden wurde,", "sodass Korrekturen durch den Therapeuten nicht nötig waren,"],
+            obj: ["was ein gutes Verständnis und Compliance zeigt.", "genau wie es das Werkstatt-Soll forderte.", "und lieferte eine solide Leistung ab."]
+        },
+        4: {
+            sub: ["erfasste auch komplexe Arbeitsvorgaben sofort", "las die technischen Abläufe vollkommen autark", "zeigte ein überdurchschnittlich gutes Verständnis für Strukturen"],
+            verb: ["und plante die nächsten Handlungsschritte selbstständig vor,", "bereitete die nötigen Utensilien vorausschauend vor,", "setzte selbst schwierige Vorgaben direkt fehlerfrei um,"],
+            obj: ["was eine hohe Werkstattreife belegt.", "was den Arbeitsfluss sichtlich beschleunigte.", "ohne ein einziges Mal nachzufragen."]
+        },
+        5: {
+            sub: ["überstieg das geforderte Verständnisniveau deutlich", "konstruierte im Alleingang eigene Lösungswege", "änderte vereinbarte Parameter eigenmächtig ab"],
+            verb: ["und korrigierte von sich aus minimale Ablauffehler,", "baute ohne Rücksprache Verbesserungen in das Werkstück ein,", "arbeitete komplett autark auf dem Niveau eines Anleiters,"],
+            obj: ["sodass im aktuellen Rahmen Unterforderung droht.", "was den zeitlichen Rahmen jedoch leicht sprengte.", "was eine Überleitung in den Markt nahelegt."]
+        }
+    },
+    qual: {
+        1: {
+            sub: ["verzichtete komplett auf eine eigene Selbstkontrolle", "missachtete sämtliche Genauigkeitsgrenzen völlig", "arbeitete ohne jede innere Strukturierung"],
+            verb: ["und führte keinerlei Zwischenprüfungen durch,", "sodass alle Ergebnisse komplett ungenau gerieten,", "verfehlte die Vorgaben durch grobe Flüchtigkeit,"],
+            obj: ["wodurch das Werkstück unbrauchbarer Ausschuss wurde.", "was das Material komplett ruinierte.", "sodass das Bauteil entsorgt werden musste."]
+        },
+        2: {
+            sub: ["machte flüchtigkeitsbedingte Fehler bei der Ausführung", "hielt die besprochenen Genauigkeiten nur ungenau ein", "zeigte Unsicherheiten im Bereich der Selbstkontrolle"],
+            verb: ["sodass das Bauteil nachträglich korrigiert werden musste,", "überging wichtige Zwischenschritte aus innerer Unruhe,", "benötigte wiederholt Hilfe beim korrekten Nachmessen,"],
+            obj: ["um das Werkstück im letzten Moment zu retten.", "was zu einem knappen Toleranzfehler führte.", "kam aber mit Geduld noch an das Ziel."]
+        },
+        3: {
+            sub: ["arbeitete absolut gewissenhaft innerhalb der Toleranz", "kontrollierte die eigenen Teilschritte verlässlich", "erzielte eine gute und saubere Passgenauigkeit"],
+            verb: ["und hielt die Qualitätsvorgaben genau ein,", "wobei Zwischenprüfungen pflichtbewusst stattfanden,", "sodass die Maße bei der Endkontrolle stimmten,"],
+            obj: ["was ein fehlerfreies Ergebnis sicherstellte.", "genau entsprechend den Vorgaben.", "in solider handwerklicher Ausführung."]
+        },
+        4: {
+            sub: ["lieferte echte Präzisionsarbeit im Zehntelbereich ab", "realisierte eine lückenlose, eigenständige Qualitätskontrolle", "erzielte perfekte Passungen bei schwierigen Werkstücken"],
+            verb: ["und nutzte die Messwerkzeuge hochprofessionell,", "wobei alle Toleranzvorgaben perfekt getroffen wurden,", "prüfte jeden Arbeitsschritt akribisch nach,"],
+            obj: ["was höchsten Ansprüchen genügt.", "was ein exzellentes Werkstoffgefühl beweist.", "ohne dass Fehler unterliefen."]
+        },
+        5: {
+            sub: ["verlor sich in mikro-präzisen Detailmessungen", "trieb den Genauigkeitsanspruch in extreme Bereiche", "realisierte Feinmechanik-Toleranzen weit über Vorgabe"],
+            verb: ["und kontrollierte dieselbe Bohrung ununterbrochen nach,", "wobei unbedeutende Oberflächenfehler überbearbeitet wurden,", "feilte minutenlang an winzigen Bruchteilen herum,"],
+            obj: ["was den zeitlichen Rahmen völlig sprengte.", "obwohl das Bauteil längst maßhaltig war.", "was Züge einer inneren Rigidität aufweist."]
+        }
+    },
+    temp: {
+        1: {
+            sub: ["arbeitete in einem extrem schleppenden Tempo", "zeigte eine massive Verlangsamung der Dynamik", "trödelte bei den einfachsten Handgriffen permanent"],
+            verb: ["und legte ununterbrochen unbegründete Pausen ein,", "blockierte den Materialfluss durch extreme Inaktivität,", "kam über Stunden hinweg kaum voran,"],
+            obj: ["sodass das Tagesziel weit verfehlt wurde.", "was therapeutisch angesprochen werden musste.", "ohne jeglichen Arbeitsantrieb."]
+        },
+        2: {
+            sub: ["arbeitete eher zögerlich und langsam", "wies ein recht verhaltenes Arbeitstempo auf", "ließ sich bei Serienarbeiten sehr viel Zeit"],
+            verb: ["und kam beim Entgraten nur mühsam vorwärts,", "neigte dazu, sich bei einfachen Schritten zu verzetteln,", "wurde durch häufiges Abschweifen ausgebremst,"],
+            obj: ["blieb aber insgesamt noch im akzeptablen Rahmen.", "sodass die Fertigstellung länger dauerte.", "schaffte das Pensum aber mit Mühe."]
+        },
+        3: {
+            sub: ["hielt ein vollkommen gleichmäßiges und normales Arbeitstempo", "arbeitete in einer angemessenen und soliden Geschwindigkeit", "zeigte einen ökonomischen Umgang mit der Zeit"],
+            verb: ["und fertigte die Stücke in der vorgegebenen Zeit an,", "wobei Serienarbeiten zügig von der Hand gingen,", "kam ohne Hektik oder Trödeln gut voran,"],
+            obj: ["was der normalen Marktnorm entspricht.", "genau im geforderten Werkstatt-Soll.", "und hielt den Arbeitsfluss stabil."]
+        },
+        4: {
+            sub: ["legte eine bemerkenswerte Schnelligkeit an den Tag", "arbeitete überaus zügig und dynamisch", "steigerte das Tempo bei Serienarbeiten deutlich"],
+            verb: ["und schaffte ein beachtliches Tagespensum,", "wobei die Qualität der Schnitte absolut stabil blieb,", "erledigte die Aufgaben weit vor der Zeitvorgabe,"],
+            obj: ["was eine hohe Leistungsfähigkeit zeigt.", "ohne dass Flüchtigkeitsfehler entstanden.", "und sparte wertvolle Werkstattzeit."]
+        },
+        5: {
+            sub: ["arbeitete in einem hektischen, fast schon gehetzten Tempo", "trieb das Arbeitstempo in extreme Bereiche", "legte eine ungesunde Überaktivität an den Tag"],
+            verb: ["und raste förmlich durch die Bearbeitungsschritte,", "wobei Werkzeuge durch die Schnelligkeit heißliefen,", "wollte Aufgaben in Rekordzeit erzwingen,"],
+            obj: ["sodass flüchtigkeitsbedingt Fehler drohten.", "was therapeutisch gebremst werden musste.", "obwohl überhaupt kein Zeitdruck vorlag."]
+        }
+    },
+    koop: {
+        1: {
+            sub: ["verhielt sich in der Arbeitsgruppe extrem unsolidarisch", "lehnte jegliche Teamarbeit strikt und verbal ab", "isolierte sich vollständig von den Mitpatienten"],
+            verb: ["und weigerte sich, beim Materialtransport zu helfen,", "beschimpfte Kollegen bei der gemeinsamen Nutzung der Säge,", "blockierte die Zuteilung von Werkzeugen an andere,"],
+            obj: ["sodass eine massive Gruppenunruhe entstand.", "was ein sofortiges therapeutisches Einzelgespräch forderte.", "sodass der Patient allein platziert werden musste."]
+        },
+        2: {
+            sub: ["zeigte ein eher distanziertes und egoistisches Gruppenverhalten", "zog sich bei Gemeinschaftsaufgaben lieber zurück", "kooperierte nur nach ausdrücklicher Aufforderung"],
+            verb: ["und überließ schwere Arbeiten lieber den Mitpatienten,", "reagierte bei der Werkzeugabsprache genervt und ungeduldig,", "achtete kaum auf die Bedürfnisse der Werkstattgruppe,"],
+            obj: ["kam nach gutem Zureden aber seinen Pflichten nach.", "sodass kleinere Reibereien entstanden.", "fügte sich aber letztlich ins Gefüge ein."]
+        },
+        3: {
+            sub: ["verhielt sich in der Arbeitsgruppe durchgehend kooperativ", "zeigte ein absolut regelrechtes und solides Gruppenverhalten", "fügte sich problemlos in das Team der Werkstattgruppe ein"],
+            verb: ["und half Mitpatienten bereitwillig bei schweren Werkstücken,", "wobei Absprachen an den Gemeinschaftsplätzen reibungslos liefen,", "teilte die zur Verfügung stehenden Messwerkzeuge kollegial,"],
+            obj: ["was dem stabilen Standard der Abteilung entspricht.", "sodass ein allzeit angenehmes Arbeitsklima herrschte.", "ohne dass es zu irgendwelchen Konflikten kam."]
+        },
+        4: {
+            sub: ["unterstützte schwächere Mitpatienten aktiv bei der Arbeit", "zeigte eine ausgeprägte soziale Kompetenz in der Gruppe", "übernahm bei Gemeinschaftsaufgaben bereitwillig Verantwortung"],
+            verb: ["und erklärte Kollegen geduldig schwierige Messschritte,", "koordinierte gemeinsame Arbeitsschritte absolut vorbildlich,", "wirkte bei kleineren Unstimmigkeiten in der Gruppe deeskalierend,"],
+            obj: ["was eine hohe soziale Reife im Alltag demonstriert.", "sodass das Teamgefüge sichtlich gestärkt wurde.", "und entlastete damit das therapeutische Personal."]
+        },
+        5: {
+            sub: ["zeigte ein dominantes, fast schon bestimmendes Gruppenverhalten", "wollte die Rolle eines Anleiters mit Gewalt erzwingen", "reglementierte Mitpatienten ununterbrochen bei Fehlern"],
+            verb: ["und teilte eigenmächtig Aufgaben an andere aus,", "kritisierte Kollegen in einem unangemessenen Tonfall,", "drängte sich bei allen Gruppenentscheidungen in den Vordergrund,"],
+            obj: ["was zu erheblichen Spannungen im Team führte.", "sodass therapeutisch Grenzen gesetzt werden mussten.", "obwohl ihm diese Rolle gar nicht zustand."]
+        }
+    },
+    krit: {
+        1: {
+            sub: ["reagierte auf fachliche Korrekturen hochgradig aggressiv", "reagierte mit offener Abwehr auf Hinweise zu Fehlmaßen", "lehnte jede therapeutische Anleitung vehement ab"],
+            verb: ["und verbat sich jede Einmischung des Fachpersonals,", "brach das Gespräch bei Kritik sofort lautstark ab,", "unterstellte dem Therapeuten böse Absichten beim Nachmessen,"],
+            obj: ["sodass eine konstruktive Arbeit nicht möglich war.", "was zu einem sofortigen Werkstattausschluss führte.", "Sicherheitsinterventionspflicht!"]
+        },
+        2: {
+            sub: ["reagierte bei Fehlern sichtlich gekränkt und empfindlich", "neigte bei Kritik zu ausgiebigen Rechtfertigungen", "tat sich schwer mit der Annahme von Korrekturen"],
+            verb: ["und schob Fehler wiederholt auf ungenaue Maschinen,", "diskutierte lange Zeit über minimale Maßabweichungen,", "verfiel nach fachlichen Hinweisen kurz in eine Schmollhaltung,"],
+            obj: ["nahm die Ratschläge am Ende aber zögerlich an.", "was den Arbeitsfortschritt unnötig verzögerte.", "konnte sich nach gutem Zureden aber fangen."]
+        },
+        3: {
+            sub: ["nahm fachliche Hinweise konstruktiv und ruhig an", "akzeptierte Korrekturen der Arbeitsausführung problemlos", "zeigte ein absolut regelrechtes Verhalten gegenüber Therapeuten"],
+            verb: ["und setzte die Ratschläge direkt am Werkstück um,", "setzte Korrekturmaße ohne Diskussionen verlässlich um,", "fragte bei Unklarheiten rechtzeitig und sachlich nach,"],
+            obj: ["was eine stabile Arbeits-Compliance belegt.", "genau wie es im Werkstattalltag erwartet wird.", "ohne in Rechtfertigungen zu verfallen."]
+        },
+        4: {
+            sub: ["forderte Rückmeldungen zur Arbeitsqualität aktiv ein", "setzte Kritik bemerkenswert reflektiert in Optimierungen um", "wies eine hervorragende therapeutische Allianz auf"],
+            verb: ["und bedankte sich für Tipps zur Materialbearbeitung,", "analysierte eigene Maßfehler im Dialog mit dem Personal,", "zeigte eine tiefe Einsicht in die technologischen Abläufe,"],
+            obj: ["was eine enorme Reife im Langzeitverlauf zeigt.", "wodurch die Qualität der Werkstücke sichtlich stieg.", "und setzte diese perfekt an der Werkbank um."]
+        },
+        5: {
+            sub: ["unterdrückte jegliche eigene Meinung bei Kritik komplett", "zeigte ein fast schon unterwürfiges Verhalten beim Nachmessen", "strebte nach einer unnatürlichen, absoluten Perfektion"],
+            verb: ["und entschuldigte sich exzessiv für kleinste Abweichungen,", "starrte bei Korrekturen regungslos und verunsichert auf den Boden,", "wollte jeden Handgriff erzwungen fehlerfrei darstellen,",],
+            obj: ["was klinisch auf eine massive innere Anspannung hindeutet.", "was therapeutisch dringend dekonstruiert werden muss.", "was auf eine latente Überlastung hinweist."]
+        }
+    },
+    sich: {
+        1: {
+            sub: ["ignorierte sämtliche Unfallverhütungsvorschriften komplett", "stellte ein akutes Sicherheitsrisiko in der Werkstatt dar", "verweigerte das Tragen der persönlichen Schutzausrüstung"],
+            verb: ["indem er Gefahrenbereiche laufender Maschinen missachtete,", "griff bei laufenden Arbeitsgeräten direkt in den Gefahrenbereich,", "arbeitete an Maschinen konsequent ohne den vorgeschriebenen Schutz,"],
+            obj: ["sodass die Arbeit sofort abgebrochen werden musste.", "was eine akute Eigengefährdung darstellte.", "was dokumentiert werden musste."]
+        },
+        2: {
+            sub: ["musste wiederholt an die Sicherheitsregeln erinnert werden", "zeigte Nachlässigkeiten beim persönlichen Arbeitsschutz", "vergaß die Schutzvorschriften bei Platzwechseln"],
+            verb: ["und setzte die Brille erst nach Aufforderung zögerlich auf,", "hielt den Sicherheitsabstand zu laufenden Geräten kaum ein,", "ließ Gehörschutz und Schutzbrille wiederholt auf der Werkbank liegen,"],
+            obj: ["sodass eine verstärkte Aufsicht nötig war.", "kam der Pflicht nach Ansprache aber nach.", "was den Ablauf immer wieder kurz unterbrach."]
+        },
+        3: {
+            sub: ["hielt alle Regeln des Arbeitsschutzes verlässlich ein", "trug die persönliche Schutzausrüstung lückenlos und eigenständig", "achtete verlässlich auf die Sicherheit am Arbeitsplatz"],
+            verb: ["und setzte die Splitterschutzbrille beim Arbeiten stets korrekt auf,", "hielt die Gefahrenbereiche um die Maschinen sauber freigehalten,", "achtete eigenständig auf die Unfallverhütungsregeln,",],
+            obj: ["was eine stabile forensische Zuverlässigkeit zeigt.", "wie es die Richtlinien der Werkstatt vorgeben.", "ohne dass Ermahnungen nötig waren."]
+        },
+        4: {
+            sub: ["wies ein ausgeprägtes und tiefes Sicherheitsbewusstsein auf", "überwachte die Einhaltung des Arbeitsschutzes eigenständig", "achtete penibel auf Gefahrenradien im Werkstattraum"],
+            verb: ["und reinigte den Boden sofort von rutschigen Metallspänen,", "wies Mitpatienten vorausschauend auf lose Kleidung beim Bohren hin,", "kontrollierte die Sicherheitsvorkehrungen vor Arbeitsbeginn verlässlich,",],
+            obj: ["was ein hohes Verantwortungsbewusstsein belegt.", "was die Werkstattsicherheit aktiv stärkte.", "vorbildlich."]
+        },
+        5: {
+            sub: ["zeigte eine fast schon zwanghafte Sicherheits-Fixierung", "kontrollierte Not-Aus-Schalter ununterbrochen im Minutentakt", "reagierte auf minimalen Funkenflug panisch und übertrieben"],
+            verb: ["und blockierte damit den eigentlichen Arbeitsfluss,", "forderte von allen Kollegen das sofortige Abschalten der Geräte,", "unterbrach die eigene Arbeit permanent für Kontrollgänge,",],
+            obj: ["was Züge einer psychotischen Struktur aufweisen könnte.", "sodass therapeutisch deeskalierend eingewirkt werden musste.", "klinisch auffällig."]
+        }
+    },
+    ordnung: {
+        1: {
+            sub: ["verstieß schwer gegen die forensische Werkzeugordnung", "versuchte Feilen und spitze Werkzeuge aktiv zu entfremden", "verweigerte die Teilnahme am zwingenden Werkzeug-Zählappell"],
+            verb: ["und versteckte gefährliche Gegenstände verdeckt in der Kleidung,", "ließ Klingen vorsätzlich ungeordnet auf der Werkbank zurück,", "verließ die Werkstatt eigenmächtig vor dem Zählappell,"],
+            obj: ["was eine sofortige Stations- und Vollzugswarnung auslöste.", "akute Gefahr im Verzug!", "was schwere forensische Konsequenzen nach sich zog."]
+        },
+        2: {
+            sub: ["zeigte deutliche Nachlässigkeiten bei der Werkzeugordnung", "räumte den eigenen Arbeitsplatz nur sehr oberflächlich auf", "musste explizit an die Einhaltung der Tafelordnung erinnert werden"],
+            verb: ["sodass Feilen beim Zählappell gesucht werden mussten,", "ließ scharfe Werkzeuge ungeschützt unter Metallspänen liegen,", "hing die Werkzeuge unvollständig zurück an die Magnettafel,"],
+            obj: ["sodass der Feierabend erst verzögert freigegeben wurde.", "was engmaschigere Kontrollen erforderte.", "säuberte den Platz aber nach Aufforderung."]
+        },
+        3: {
+            sub: ["beteiligte sich absolut zuverlässig am Zählappell", "hielt die Werkzeugordnung strikt und eigenständig ein", "räumte den Arbeitsplatz vorbildlich und sauber auf"],
+            verb: ["und hängte alle genutzten Feilen exakt an den Platz,", "wobei die Werkzeugtafel lückenlos kontrolliert wurde,", "verstaute die Messwerkzeuge ordnungsgemäß im Kasten,"],
+            obj: ["was eine stabile forensische Compliance belegt.", "genau wie es die Sicherheitsvorgaben verlangen.", "sodass keinerlei Beanstandungen vorlagen."]
+        },
+        4: {
+            sub: ["wies eine vorbildliche Disziplin bei der Werkzeugordnung auf", "unterstützte das Fachpersonal aktiv beim Zählappell", "führte eine akribische Eigenkontrolle der Werkzeuge durch"],
+            verb: ["und achtete penibel auf die Vollständigkeit der Magnettafel,", "mahnte Mitpatienten eigenständig zur Einhaltung der Ordnung,", "kontrollierte den Werkstattbereich vor Feierabend verlässlich,"],
+            obj: ["was ein hohes Verantwortungsbewusstsein zeigt.", "wodurch der Zählappell erheblich beschleunigte.", "absolut verlässlich."]
+        },
+        5: {
+            sub: ["zeigte ein zwanghaftes Kontrollverhalten an der Werkzeugtafel", "zählte die Feilen ununterbrochen im Minutentakt nach", "reagierte bei minimalen Unvollständigkeiten sofort panisch"],
+            verb: ["und blockierte damit den Feierabend der gesamten Gruppe,", "unterbrach die eigene Arbeit permanent für Kontrollgänge,", "kontrollierte die Werkzeugschränke obsessiv im Sekundentakt,"],
+            obj: ["was Züge einer ausgeprägten Rigidität aufweist.", "was therapeutisch gebremst werden musste.", "klinisch auffällig."]
+        }
+    },
+    frust: {
+        1: {
+            sub: ["reagierte auf Werkzeugbruch hochgradig aggressiv", "dekompensierte bei Maßfehlern sofort affektiv", "schmiss fehlerhafte Werkstücke impulsiv durch den Raum"],
+            verb: ["und agierte extrem destruktiv gegen das Inventar,", "bedrohte Mitpatienten verbal und schlug auf den Schraubstock ein,", "verfiel bei Misserfolg in ein unkontrolliertes Wutverhalten,"],
+            obj: ["sodass ein sofortiger Werkstattausschluss erfolgte.", "was eine akute Sicherheitsintervention erforderte.", "massives Sicherheitsrisiko!"]
+        },
+        2: {
+            sub: ["reagierte bei Fehlern sichtlich frustriert und gekränkt", "wies eine recht niedrige Frustrationstoleranz auf", "neigte bei Misserfolgen zu vehementen Rechtfertigungen"],
+            verb: ["und stellte die Mitarbeit unwillig temporär ein,", "schob auftretende Fehler sofort auf das Material,", "verfiel nach fachlichen Hinweisen kurz in eine Schmollhaltung,"],
+            obj: ["sodass eine kurze Beruhigungspause nötig war.", "was ein Weiterarbeiten zunächst blockierte.", "konnte sich nach gutem Zureden aber wieder fangen."]
+        },
+        3: {
+            sub: ["regulierte auftretenden Frust vollkommen adäquat", "blieb bei Fehlern emotional absolut stabil", "bewältigte handwerkliche Rückschläge ruhig und besonnen"],
+            verb: ["und suchte sachlich nach einer handwerklichen Lösung,", "akzeptierte Misserfolge ohne emotionale Ausbrüche,", "fragte den Therapeuten ruhig nach Korrekturmöglichkeiten,"],
+            obj: ["ohne in verbale Rechtfertigungen zu verfallen.", "wie es im strukturierten Werkstattalltag erwartet wird.", "was eine gute emotionale Reife im Rahmen zeigt."]
+        },
+        4: {
+            sub: ["analysierte Fehlerursachen bemerkenswert besonnen", "bewies eine außergewöhnlich hohe Resilienz bei Rückschlägen", "nutzte handwerkliche Fehler als konstruktive Lernmomente"],
+            verb: ["und erarbeitete selbstständig effektive Lösungswege,", "blieb auch bei schwierigen Materialfehlern tiefenentspannt,", "wirkte deeskalierend auf frustrierte Mitpatienten ein,"],
+            obj: ["was eine hervorragende Selbstregulation belegt.", "auf einem sehr hohen klinischen Niveau.", "was eine vorbildliche Entwicklung zeigt."]
+        },
+        5: {
+            sub: ["unterdrückte jegliche emotionale Regung bei Misserfolgen", "zeigte eine unnatürliche, fast apathische Fehler-Toleranz", "strebte nach einer erzwungenen Fehlerfreiheit"],
+            verb: ["und verbot sich selbst starr die kleinste Abweichung,", "starrte bei Bohrungsfehlern stundenlang regungslos vor sich hin,", "verbarg Fehler aus Angst vor Unvollkommenheit vor dem Personal,"],
+            obj: ["was klinisch auf eine massive innere Anspannung hindeutet.", "was therapeutenübergreifend besprochen werden muss.", "was auf eine latente Überlastung hinweist."]
+        }
     }
+};
 
-    const selections = {};
-
-    function selectOption(critId, optIdx) {
-      const crit = criteriaData.find(c => c.id === critId);
-      
-      for (let j = 0; j < crit.options.length; j++) {
-        const btn = document.getElementById('btn-' + critId + '-' + j);
-        if (btn) {
-          btn.className = 'criterion-btn text-left text-xs p-2 rounded-md border border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-500 transition';
-        }
-      }
-
-      if (selections[critId] === optIdx) {
-        delete selections[critId];
-      } else {
-        selections[critId] = optIdx;
-        const selectedBtn = document.getElementById('btn-' + critId + '-' + optIdx);
-        if (selectedBtn) {
-          selectedBtn.className = 'criterion-btn text-left text-xs p-2 rounded-md border border-indigo-400 bg-indigo-600 text-white font-medium transition';
-        }
-      }
-
-      generateReport();
+function toggleRow(id) {
+    const chk = document.getElementById('chk_' + id);
+    const row = document.getElementById('row_' + id);
+    const slider = document.getElementById('m_' + id);
+    
+    if (chk && chk.checked) {
+        row.classList.remove('disabled');
+        if (slider) slider.disabled = false;
+    } else {
+        row.classList.add('disabled');
+        if (slider) slider.disabled = true;
     }
+}
 
-    function toggleReportMode() {
-      isShortReportMode = !isShortReportMode;
-      const btn = document.getElementById('modeToggle');
-      btn.innerText = isShortReportMode ? 'Modus: 14-Tage-Kurzbericht (KIS)' : 'Modus: Ausführlicher Verlaufsbericht';
-      btn.className = isShortReportMode 
-        ? 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-sm'
-        : 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm';
-      generateReport();
-    }
+function updateValIndicator(slider) {
+    const indicator = document.getElementById(slider.id + '_val');
+    if (indicator) indicator.innerText = slider.value;
+}
 
-    function generateReport() {
-      const name = document.getElementById('patientName').value.trim() || 'Der Patient';
-      const period = document.getElementById('reportPeriod').value.trim();
-      
-      const sentences = [];
+function getRandom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
 
-      for (let i = 0; i < criteriaData.length; i++) {
-        let crit = criteriaData[i];
-        if (selections[crit.id] !== undefined) {
-          let optIdx = selections[crit.id];
-          sentences.push(crit.options[optIdx].text);
+function processGeneration() {
+    const name = document.getElementById('pName').value || "Herr M.";
+    const pronoun = document.getElementById('pPronoun').value;
+    const weekStyle = document.getElementById('pWeek').value;
+    const textLimit = parseInt(document.getElementById('pTextLimit').value);
+
+    const keys = ['konz', 'anw', 'qual', 'temp', 'koop', 'krit', 'sich', 'ordnung', 'frust'];
+    let activeKeys = [];
+    keys.forEach(k => {
+        const chk = document.getElementById('chk_' + k);
+        if (chk && chk.checked) {
+            activeKeys.push(k);
         }
-      }
+    });
 
-      if (sentences.length === 0) {
-        document.getElementById('reportOutput').value = '';
-        updateStats();
+    if (activeKeys.length === 0) {
+        document.getElementById('reportOutput').value = "Aktivieren Sie oben die Kontrollkästchen der gewünschten Module, um den Bericht live zu erstellen...";
         return;
-      }
+    }
 
-      let reportText = '';
+    let segments = [];
+    const transitions = ["Darüber hinaus ", "Zudem ", "Des Weiteren ", "Gleichzeitig ", "Im Verlauf der Einheiten "];
 
-      if (isShortReportMode) {
-        reportText = 'Im Berichtszeitraum ' + (period ? '(' + period + ') ' : '') + name + ' ' + sentences.join(', ') + '.';
-      } else {
-        reportText = 'Arbeitstherapeutischer Verlaufsbericht § 63 StGB\n';
-        reportText += 'Patient: ' + name + '\n';
-        if (period) reportText += 'Zeitraum: ' + period + '\n';
-        reportText += '\nBeurteilung im Detail:\n';
-        for (let i = 0; i < sentences.length; i++) {
-          reportText += '- ' + name + ' ' + sentences[i] + '.\n';
+    activeKeys.forEach((k, index) => {
+        const score = parseInt(document.getElementById('m_' + k).value);
+        const data = lEngine[k][score];
+        
+        let sub = getRandom(data.sub);
+        let verb = getRandom(data.verb);
+        let obj = getRandom(data.obj);
+
+        sub = sub.trim();
+        sub = sub.replace(/^kr\s/i, "er ")
+                 .replace(/^heigte/i, "zeigte")
+                 .replace(/^reigte/i, "zeigte")
+                 .replace(/^veigte/i, "zeigte")
+                 .replace(/^hachte/i, "machte")
+                 .replace(/^krbeitete/i, "arbeitete")
+                 .replace(/^vügte/i, "fügte")
+                 .replace(/^zügte/i, "fügte")
+                 .replace(/^arug/i, "trug")
+                 .replace(/^hchtete/i, "achtete")
+                 .replace(/^rählte/i, "zählte")
+                 .replace(/^weglementierte/i, "reglementierte")
+                 .replace(/^snterdrückte/i, "unterdrückte");
+
+        if (!verb.trim().startsWith("und") && !verb.trim().startsWith(",") && !verb.trim().startsWith("wobei") && !verb.trim().startsWith("indem")) {
+            verb = " und " + verb;
         }
-      }
 
-      document.getElementById('reportOutput').value = reportText;
-      updateStats();
+        if (textLimit < 70) {
+            sub = sub.replace(/(wies eine|zeigte eine|demonstrierte eine)/g, "war");
+            verb = verb.replace(/(wobei|sodass die|und benötigte|und realisierte)/g, "und");
+            obj = obj.replace(/(was dem stabilen Standard entspricht|was ein hohes Qualitätsbewusstsein zeigt|genau wie es an der Werkbank gefordert ist|was eine stabile forensische Compliance belegt)/g, "");
+        }
+
+        const wordsArray = sub.split(" ");
+        const firstW = wordsArray[0].toLowerCase();
+        const verben = ["arbeitete", "zeigte", "ließ", "führte", "bediente", "verhielt", "zog", "kooperierte", "nahm", "akzeptierte", "fragte", "forderte", "hielt", "trug", "achtete", "beteiligte", "räumte", "reagierte", "dekompensierte", "schmiss", "regulierte", "bewältigte", "analysierte", "nutzte", "unterdrückte", "strebte", "wies", "demonstrierte", "machte", "fügte", "konstruierte", "entwickelte", "verweigerte", "ignorierte", "wich", "tat", "brauchte", "spannte", "erzielte", "übertrug", "mahnte"];
+        
+        let currentSubj = (index === 0 || index % 3 === 0) ? name : pronoun;
+        let segmentText = "";
+
+        if (verben.includes(firstW)) {
+            segmentText = currentSubj + " " + sub.charAt(0).toLowerCase() + sub.slice(1) + " " + verb + " " + obj;
+        } else if (firstW === "er" || firstW === "sie" || sub.startsWith("Der Patient")) {
+            let restSub = sub.substring(wordsArray[0].length).trim();
+            if (sub.startsWith("Der Patient")) restSub = sub.substring(11).trim();
+            segmentText = currentSubj + " " + restSub.charAt(0).toLowerCase() + restSub.slice(1) + " " + verb + " " + obj;
+        } else {
+            segmentText = currentSubj + " " + sub.charAt(0).toLowerCase() + sub.slice(1) + " " + verb + " " + obj;
+        }
+
+        segmentText = segmentText.replace(/und sodass/g, "sodass").replace(/\s+/g, " ").trim();
+        if (!segmentText.endsWith(".")) segmentText += ".";
+
+        if (index > 0) {
+            let trans = getRandom(transitions).trim();
+            let segWords = segmentText.split(" ");
+            let sSubj = segWords[0];
+            let sVerb = segWords[1];
+            
+            if (sSubj === "Herr") {
+                sSubj = "Herr M.";
+                sVerb = segWords[2];
+                let sRemainder = segWords.slice(3).join(" ");
+                segmentText = trans + " " + sVerb + " " + sSubj + " " + sRemainder;
+            } else {
+                let sRemainder = segWords.slice(2).join(" ");
+                segmentText = trans + " " + sVerb + " " + sSubj.toLowerCase() + " " + sRemainder;
+            }
+        }
+
+        segments.push(segmentText);
+    });
+
+    let intro = "";
+    if (weekStyle === "1") intro = "In dieser Arbeitswoche ";
+    if (weekStyle === "2") intro = "In der aktuellen Woche ";
+    if (weekStyle === "3") intro = "Im Verlauf dieser Woche ";
+    if (weekStyle === "4") intro = "Während der Erprobungswoche ";
+
+    let finalOutput = segments.join(" ");
+    if (intro !== "") {
+        let firstSegWords = segments[0].split(" ");
+        let firstSubj = firstSegWords[0];
+        let firstVerb = firstSegWords[1];
+        
+        if (firstSubj === "Herr") {
+            firstSubj = "Herr M.";
+            firstVerb = firstSegWords[2];
+            finalOutput = intro + firstVerb + " " + firstSubj + " " + firstSegWords.slice(3).join(" ") + " " + segments.slice(1).join(" ");
+        } else {
+            finalOutput = intro + firstVerb + " " + firstSubj.toLowerCase() + " " + firstSegWords.slice(2).join(" ") + " " + segments.slice(1).join(" ");
+        }
+    }
+    
+    finalOutput = finalOutput.replace(/\s+/g, " ").trim();
+    let wordsCount = finalOutput.split(/\s+/).filter(Boolean).length;
+
+    if (wordsCount > textLimit) {
+        let sentenceArray = finalOutput.match(/[^.!?]+[.!?]+/g) || [finalOutput];
+        let shortenedText = "";
+        let currentWords = 0;
+
+        for (let i = 0; i < sentenceArray.length; i++) {
+            let sLength = sentenceArray[i].split(/\s+/).filter(Boolean).length;
+            if (currentWords + sLength <= textLimit || shortenedText === "") {
+                shortenedText += sentenceArray[i] + " ";
+                currentWords += sLength;
+            } else {
+                break;
+            }
+        }
+        finalOutput = shortenedText.trim();
     }
 
-    function updateStats() {
-      const text = document.getElementById('reportOutput').value;
-      const words = text ? text.trim().split(/\s+/).length : 0;
-      const chars = text.length;
-      document.getElementById('statsText').innerText = words + ' Wörter | ' + chars + ' Zeichen';
+    const outputField = document.getElementById('reportOutput');
+    if (outputField) {
+        outputField.value = finalOutput;
     }
+}
 
-    function copyToClipboard() {
-      const output = document.getElementById('reportOutput');
-      if (!output.value) return;
-      output.select();
-      navigator.clipboard.writeText(output.value);
-      alert('Bericht in die Zwischenablage kopiert!');
+function copyToClipboard() {
+    const textarea = document.getElementById('reportOutput');
+    if (!textarea || !textarea.value) {
+        alert("Es wurde noch kein Text generiert!");
+        return;
     }
-
-    function resetForm() {
-      document.getElementById('patientName').value = '';
-      document.getElementById('reportPeriod').value = '';
-      Object.keys(selections).forEach(key => delete selections[key]);
-      renderCriteria();
-      generateReport();
+    textarea.select();
+    textarea.setSelectionRange(0, 99999);
+    try {
+        navigator.clipboard.writeText(textarea.value);
+        alert("Bericht erfolgreich kopiert!");
+    } catch (err) {
+        alert("Bitte markieren Sie den Text manuell zum Kopieren.");
     }
+}
 
-    renderCriteria();
-  </script>
+function resetMatrix() {
+    const sliders = document.querySelectorAll('.slider');
+    sliders.forEach(s => {
+        s.value = 3;
+        s.disabled = true;
+        const indicator = document.getElementById(s.id + '_val');
+        if (indicator) indicator.innerText = "3";
+    });
+    
+    const checkboxes = document.querySelectorAll('.opt-in-check');
+    checkboxes.forEach(c => {
+        c.checked = false;
+        const rowId = c.id.replace('chk_', '');
+        const row = document.getElementById('row_' + rowId);
+        if (row) row.classList.add('disabled');
+    });
+
+    document.getElementById('pWeek').value = "0";
+    document.getElementById('pTextLimit').value = "90";
+    document.getElementById('wLimitVal').innerText = "90";
+    document.getElementById('reportOutput').value = "Aktivieren Sie oben die Kontrollkästchen der gewünschten Module, um den Bericht live zu erstellen...";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    resetMatrix();
+});
+</script>
 </body>
 </html>
